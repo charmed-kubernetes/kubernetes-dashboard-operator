@@ -510,7 +510,8 @@ class TestCharmNamespaceProperty(unittest.TestCase):
 
 class TestCharmPodIpProperty(unittest.TestCase):
     @patch("charm.KubernetesServicePatch", lambda x, y: None)
-    @patch("charm.check_output", lambda x: b"10.10.10.10\n")
+    @patch("charm.socket.getfqdn", lambda: "hostname")
+    @patch("charm.socket.gethostbyname", lambda x: "10.10.10.10")
     @patch(f"{CHARM}._namespace", "dashboard")
     def test_property_pod_ip(self):
         harness = Harness(KubernetesDashboardCharm)

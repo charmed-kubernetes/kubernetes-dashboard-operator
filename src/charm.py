@@ -6,10 +6,10 @@
 
 import datetime
 import logging
+import socket
 import traceback
 from glob import glob
 from ipaddress import IPv4Address
-from subprocess import check_output
 from typing import List, Optional
 
 from charms.kubernetes_dashboard.v0.cert import SelfSignedCert
@@ -262,7 +262,8 @@ class KubernetesDashboardCharm(CharmBase):
     @property
     def _pod_ip(self) -> Optional[IPv4Address]:
         """Get the IP address of the Kubernetes pod."""
-        return IPv4Address(check_output(["unit-get", "private-address"]).decode().strip())
+        fqdn = socket.getfqdn()
+        return IPv4Address(socket.gethostbyname(fqdn))
 
 
 if __name__ == "__main__":  # pragma: nocover
