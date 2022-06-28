@@ -79,6 +79,8 @@ class TestCharm(unittest.TestCase):
         self.harness = Harness(KubernetesDashboardCharm)
         self.addCleanup(self.harness.cleanup)
         self.harness.begin()
+        self.harness.set_can_connect("dashboard", True)
+        self.harness.set_can_connect("scraper", True)
         self.charm = self.harness.charm
 
     @patch(f"{CHARM}._create_kubernetes_resources")
@@ -138,7 +140,6 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(self.charm.unit.status, ActiveStatus())
 
     def test_scraper_pebble_ready_success(self):
-        self.harness.set_can_connect("scraper", True)
         self.assertEqual(self.harness.get_container_pebble_plan("scraper")._services, {})
         self.harness.container_pebble_ready("scraper")
         expected = {"scraper": {"override": "replace", "command": "/metrics-sidecar"}}
@@ -161,7 +162,6 @@ class TestCharm(unittest.TestCase):
 
     @patch(f"{CHARM}._configure_tls_certs")
     def test_configure_dashboard_success(self, certs):
-        self.harness.set_can_connect("dashboard", True)
         # setup the charm with no initial command in storedstate
         cmd = self.charm._dashboard_cmd
         self.assertEqual(self.charm._stored.dashboard_cmd, "")
@@ -192,8 +192,8 @@ class TestCharm(unittest.TestCase):
     def test_configure_dashboard_no_pebble_connection(self, certs):
         # Check we return false when the charm cannot connect to pebble
         self.charm._stored.dashboard_cmd = "foobar"
-        with patch("ops.model.Container.can_connect", lambda x: False):
-            result = self.charm._configure_dashboard()
+        self.harness.set_can_connect("dashboard", False)
+        result = self.charm._configure_dashboard()
         self.assertFalse(result)
         certs.assert_not_called()
 
@@ -205,20 +205,12 @@ class TestCharm(unittest.TestCase):
         )
         self.assertEqual(self.charm._dashboard_cmd, expected)
 
-    @patch("ops.model.Container.make_dir")
-    @patch("ops.model.Container.pull")
     @patch(f"{CHARM}._validate_certificate")
-    @patch("ops.model.Container.list_files", Mock(return_value=[SimpleNamespace(name="tls.crt")]))
-    def test_configure_tls_certs_already_present_and_valid(self, validate, pull, mkdir):
+    def test_configure_tls_certs_already_present_and_valid(self, validate):
         validate.return_value = True
-        pull.return_value = BytesIO(TEST_CERTIFICATE)
-
-        self.harness.set_can_connect("dashboard", True)
+        container = self.charm.unit.get_container("dashboard")
+        container.push("/certs/tls.crt", TEST_CERTIFICATE, make_dirs=True)
         self.charm._configure_tls_certs()
-
-        # Ensure that we try to create a directory for the certificates
-        mkdir.assert_called_with("/certs", make_parents=True)
-        pull.assert_called_with("/certs/tls.crt")
         validate.assert_called_with(x509.load_pem_x509_certificate(TEST_CERTIFICATE))
 
     @patch("charm.SelfSignedCert")
@@ -226,7 +218,6 @@ class TestCharm(unittest.TestCase):
     @patch("charm.Client.get", Mock(return_value=Service(spec=ServiceSpec(clusterIP="1.1.1.1"))))
     def test_configure_tls_certs_already_present_and_invalid(self, cert):
         cert.return_value = SimpleNamespace(key=b"deadbeef", cert=b"deadbeef")
-        self.harness.set_can_connect("dashboard", True)
         self.charm._configure_tls_certs()
         cert.assert_called_with(
             names=["kubernetes-dashboard.dashboard.svc.cluster.local"],
@@ -241,7 +232,6 @@ class TestCharm(unittest.TestCase):
     def test_configure_tls_certs_not_present(self, get, cert):
         cert.return_value = SimpleNamespace(key=b"deadbeef", cert=b"deadbeef")
         get.return_value = Service(spec=ServiceSpec(clusterIP="1.1.1.1"))
-        self.harness.set_can_connect("dashboard", True)
         self.charm._configure_tls_certs()
         get.assert_called_once()
         cert.assert_called_with(
