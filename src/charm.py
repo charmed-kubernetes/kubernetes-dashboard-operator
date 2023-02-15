@@ -6,6 +6,9 @@
 
 import datetime
 import logging
+import os
+import signal
+import sys
 import traceback
 from glob import glob
 from ipaddress import IPv4Address
@@ -241,4 +244,10 @@ class KubernetesDashboardCharm(CharmBase):
 
 
 if __name__ == "__main__":  # pragma: nocover
+    # Workaround for Error status after the StatefulSet is patched in the pebble-ready hook
+    def _signal_worker(*args) -> None:
+        os.kill(os.getppid(), signal.SIGTERM)
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, _signal_worker)
     main(KubernetesDashboardCharm)
