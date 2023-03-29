@@ -15,3 +15,4 @@ parts:
       # required for installing cryptography (cargo also contains rust):
       - cargo
       - libssl-dev
+      - pkg-config
