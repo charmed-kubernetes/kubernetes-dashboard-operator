@@ -25,8 +25,23 @@ logger = logging.getLogger(__name__)
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 
 
+def pytest_addoption(parser):
+    parser.addoption("--arch", action="store", default="amd64")
+    parser.addoption("--series", action="store", default="focal")
+
+
+@pytest.fixture
+def arch(request):
+    return request.config.getoption("--arch")
+
+
+@pytest.fixture
+def series(request):
+    return request.config.getoption("--series")
+
+
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest):
+async def test_build_and_deploy(ops_test: OpsTest, arch: str, series: srt):
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
@@ -38,7 +53,8 @@ async def test_build_and_deploy(ops_test: OpsTest):
         "scraper-image": METADATA["resources"]["scraper-image"]["upstream-source"],
     }
     await ops_test.model.deploy(
-        charm, resources=resources, application_name="dashboard", trust=True, series="jammy"
+        charm, resources=resources, application_name="dashboard", trust=True, 
+        series=series, constraints=f"arch={arch}"
     )
 
     # issuing dummy update_status just to trigger an event

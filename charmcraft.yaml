@@ -3,16 +3,20 @@
 
 type: charm
 bases:
-  - name: "ubuntu"
-    channel: "22.04"
+  - build-on:
+    - name: ubuntu
+      channel: "20.04"
+    run-on:
+    - name: ubuntu
+      channel: "20.04"
+      architectures:
+        - amd64
+        - arm64
+        - armhf
+        - ppc64
+        - s390x
 parts:
   charm:
     charm-python-packages: [setuptools, pip]
     build-packages:
       - git
-      # required for installing cffi:
-      - libffi-dev
-      # required for installing cryptography (cargo also contains rust):
-      - cargo
-      - libssl-dev
-      - pkg-config
