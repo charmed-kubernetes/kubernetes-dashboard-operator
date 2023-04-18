@@ -58,6 +58,17 @@ self_signed_cert = SelfSigned(
 ```
 """
 
+# The unique Charmhub library identifier, never change it
+LIBID = "6b649bc0040448399cfc718a6fcba24d"
+
+# Increment this major API version when introducing breaking changes
+LIBAPI = 1
+
+# Increment this PATCH version before using `charmcraft publish-lib` or reset
+# to 0 if you are raising the major API version
+LIBPATCH = 0
+
+
 from datetime import datetime, timedelta
 from ipaddress import IPv4Address
 from typing import List
@@ -115,10 +126,14 @@ class SelfSignedCert:
 
         _binary = Path(__file__).parent / "gen-certificate.sh"
         _args: List[str] = [
-            "--names", ",".join(self.names),
-            "--ips", ",".join(map(str, self.ips)),
-            "--keysize", str(self._key_size),
-            "--days", str(self._validity),
+            "--names",
+            ",".join(self.names),
+            "--ips",
+            ",".join(map(str, self.ips)),
+            "--keysize",
+            str(self._key_size),
+            "--days",
+            str(self._validity),
         ]
         check_call([_binary, *_args])
         self.ca = Path("/tmp/ca.crt").read_text()
@@ -136,8 +151,7 @@ class SelfSignedCert:
             except CalledProcessError:
                 return False
         before, after = [
-            datetime.strptime(_.split("=")[1], "%b %d %H:%M:%S %Y %Z")
-            for _ in dates.splitlines()
+            datetime.strptime(_.split("=")[1], "%b %d %H:%M:%S %Y %Z") for _ in dates.splitlines()
         ]
         now = datetime.utcnow()
         return before <= now <= after
@@ -158,4 +172,3 @@ class SelfSignedCert:
             if "DNS:" in _
             for dns in _.split(", ")
         ]
-
