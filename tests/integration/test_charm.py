@@ -25,21 +25,6 @@ logger = logging.getLogger(__name__)
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 
 
-def pytest_addoption(parser):
-    parser.addoption("--arch", action="store", default="amd64")
-    parser.addoption("--series", action="store", default="focal")
-
-
-@pytest.fixture
-def arch(request):
-    return request.config.getoption("--arch")
-
-
-@pytest.fixture
-def series(request):
-    return request.config.getoption("--series")
-
-
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest, arch: str, series: str):
     """Build the charm-under-test and deploy it together with related charms.
@@ -85,7 +70,7 @@ async def test_kubernetes_resources_created(ops_test: OpsTest):
 
 @pytest.mark.abort_on_fail
 async def test_dashboard_is_up(ops_test: OpsTest):
-    status = await ops_test.model.get_status()  # noqa: F821
+    status = await ops_test.model.get_status()
     address = status["applications"]["dashboard"]["units"]["dashboard/0"]["address"]
 
     url = f"https://{address}:8443"
