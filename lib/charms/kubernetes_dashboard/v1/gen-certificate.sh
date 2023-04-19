@@ -13,10 +13,10 @@ detailed explanation and additional instructions.
 usage: ${0} [OPTIONS]
 The following flags are required.
        --names            Comma separated list of dns names to associate with cert 
-       --ips              Comma separated list of ips to associate with cert 
-       --namespace        Namespace where webhook service resides.                 Default 'default'
-       --keysize          a bit length of at least 2048 when using RSA.            Default 2048
-       --days             Period in days the certificate is valid for.             Default 3650
+       --ips              Comma separated list of ips to associate with cert       Default: Empty Set
+       --namespace        Namespace where webhook service resides.                 Default: 'default'
+       --keysize          a bit length of at least 2048 when using RSA.            Default: 2048
+       --days             Period in days the certificate is valid for.             Default: 3650
 EOF
     exit 0
 }
@@ -55,11 +55,7 @@ if [ ${#NAMES[@]} -eq 0 ]; then
     exit 1
 fi
 
-if [ ${#IPS[@]} -eq 0 ]; then
-    echo "'--names' must be specified"
-    exit 1
-fi
-
+[[ ${#IPS[@]} -eq 0 ]] && IPS=()
 [[ -z ${KEYSIZE} ]] && KEYSIZE=2048
 [[ -z ${DAYS} ]] && DAYS=3650
 
@@ -87,8 +83,8 @@ subjectAltName = @alt_names
 
 [ v3_req ]
 basicConstraints = CA:FALSE
-keyUsage = nonRepudiation, digitalSignature, keyEncipherment
-extendedKeyUsage = serverAuth
+keyUsage = digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth, clientAuth
 subjectAltName = @alt_names
 
 [alt_names]

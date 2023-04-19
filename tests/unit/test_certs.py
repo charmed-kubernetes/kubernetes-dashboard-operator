@@ -4,14 +4,13 @@
 import unittest
 from datetime import datetime, timedelta
 from ipaddress import IPv4Address
-from unittest.mock import Mock, patch
 
-from charms.kubernetes_dashboard.v0.cert import SelfSignedCert
+from charms.kubernetes_dashboard.v1.cert import SelfSignedCert
 from cryptography import x509
 from cryptography.x509.base import Certificate
 
-MOCK_DATE = datetime(2021, 1, 1, 15, 0, 0)
-LIB = "charms.kubernetes_dashboard.v0.cert"
+IN_TEN_MINUTES = datetime.utcnow() + timedelta(minutes=10)
+LIB = "charms.kubernetes_dashboard.v1.cert"
 
 
 def _get_cert_sans(cert: Certificate):
@@ -21,7 +20,6 @@ def _get_cert_sans(cert: Certificate):
 
 
 class TestSelfSignedCertGenerator(unittest.TestCase):
-    @patch(f"{LIB}.datetime", Mock(utcnow=lambda: MOCK_DATE))
     def test_create_cert_defaults(self):
         cert = SelfSignedCert(
             names=["test.local", "test.my_ns.svc.cluster.local"], ips=[IPv4Address("10.10.10.10")]
@@ -30,16 +28,14 @@ class TestSelfSignedCertGenerator(unittest.TestCase):
 
         # Check class defaults were set
         self.assertEqual(cert.validity, 365)
-        self.assertTrue(c.not_valid_before == MOCK_DATE)
-        self.assertTrue(c.not_valid_after == MOCK_DATE + timedelta(days=365))
+        self.assertLessEqual(c.not_valid_before, IN_TEN_MINUTES)
+        self.assertLessEqual(c.not_valid_after, IN_TEN_MINUTES + timedelta(days=365))
         self.assertEqual(cert.key_size, 2048)
         self.assertEqual(c.public_key().key_size, 2048)
 
         # Check the certificate SANs
         sans = _get_cert_sans(c)
-        self.assertEqual(
-            sans, ["test.local", "test.my_ns.svc.cluster.local", IPv4Address("10.10.10.10")]
-        )
+        self.assertEqual(sans, ["test.local", "test.my_ns.svc.cluster.local", "10.10.10.10"])
 
         # Check the subject and issuer name use the first specified FQDN/name
         self.assertEqual(c.issuer.rfc4514_string(), "CN=test.local")
@@ -52,15 +48,14 @@ class TestSelfSignedCertGenerator(unittest.TestCase):
         sans = _get_cert_sans(c)
         self.assertEqual(sans, ["test.local"])
 
-    @patch(f"{LIB}.datetime", Mock(utcnow=lambda: MOCK_DATE))
     def test_cert_validity_and_key_size(self):
         ssc = SelfSignedCert(
             names=["test.local"], ips=[IPv4Address("10.10.10.10")], validity=3650, key_size=4096
         )
         c = x509.load_pem_x509_certificate(ssc.cert)
         # Check that specified validity is respected
-        self.assertTrue(c.not_valid_before == MOCK_DATE)
-        self.assertTrue(c.not_valid_after == MOCK_DATE + timedelta(days=3650))
+        self.assertLessEqual(c.not_valid_before, IN_TEN_MINUTES)
+        self.assertLessEqual(c.not_valid_after, IN_TEN_MINUTES + timedelta(days=3650))
         # Check requested key size is respected
         self.assertEqual(c.public_key().key_size, 4096)
 

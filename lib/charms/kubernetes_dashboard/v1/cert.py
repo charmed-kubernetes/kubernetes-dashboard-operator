@@ -114,8 +114,8 @@ class SelfSignedCert:
         # Create a list of x509IPAdress objects from the list of IPv4Addresses
         self.ips = ips
         # Initialise some values
-        self._key_size = key_size
-        self._validity = validity
+        self.key_size = key_size
+        self.validity = validity
         self.cert = None
         self.key = None
         # Generate the certificate
@@ -131,23 +131,23 @@ class SelfSignedCert:
             "--ips",
             ",".join(map(str, self.ips)),
             "--keysize",
-            str(self._key_size),
+            str(self.key_size),
             "--days",
-            str(self._validity),
+            str(self.validity),
         ]
         check_call([_binary, *_args])
-        self.ca = Path("/tmp/ca.crt").read_text()
-        self.cert = Path("/tmp/server.crt").read_text()
-        self.key = Path("/tmp/server.key").read_text()
+        self.ca = Path("/tmp/ca.crt").read_bytes()
+        self.cert = Path("/tmp/server.crt").read_bytes()
+        self.key = Path("/tmp/server.key").read_bytes()
 
     @staticmethod
-    def validate_cert_date(in_crt: bytes, encoding="utf-8") -> bool:
-        with NamedTemporaryFile(mode="w+b", encoding=encoding) as crt:
+    def validate_cert_date(in_crt: bytes) -> bool:
+        with NamedTemporaryFile(mode="w+b") as crt:
             crt.write(in_crt)
             crt.flush()
             try:
                 cmd = f"openssl x509 -in {crt.name} -noout -dates".split()
-                dates = check_output(cmd)
+                dates = check_output(cmd, text=True)
             except CalledProcessError:
                 return False
         before, after = [
@@ -157,13 +157,13 @@ class SelfSignedCert:
         return before <= now <= after
 
     @staticmethod
-    def sans_from_cert(in_crt: bytes, encoding="utf-8") -> List[str]:
-        with NamedTemporaryFile(mode="w+b", encoding=encoding) as crt:
+    def sans_from_cert(in_crt: bytes) -> List[str]:
+        with NamedTemporaryFile(mode="w+b") as crt:
             crt.write(in_crt)
             crt.flush()
             try:
                 cmd = f"openssl x509 -in {crt.name} -noout -ext subjectAltName".split()
-                output = check_output(cmd)
+                output = check_output(cmd, text=True)
             except CalledProcessError:
                 return []
         return [

@@ -41,7 +41,7 @@ def series(request):
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest, arch: str, series: srt):
+async def test_build_and_deploy(ops_test: OpsTest, arch: str, series: str):
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
@@ -53,8 +53,12 @@ async def test_build_and_deploy(ops_test: OpsTest, arch: str, series: srt):
         "scraper-image": METADATA["resources"]["scraper-image"]["upstream-source"],
     }
     await ops_test.model.deploy(
-        charm, resources=resources, application_name="dashboard", trust=True, 
-        series=series, constraints=f"arch={arch}"
+        charm,
+        resources=resources,
+        application_name="dashboard",
+        trust=True,
+        series=series,
+        constraints=f"arch={arch}",
     )
 
     # issuing dummy update_status just to trigger an event

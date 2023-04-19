@@ -4,7 +4,6 @@
 
 """Charmed Operator for the Official Kubernetes Dashboard."""
 
-import datetime
 import logging
 import traceback
 from glob import glob
@@ -188,14 +187,17 @@ class KubernetesDashboardCharm(CharmBase):
                             raise
         return True
 
-    def _validate_certificate(self, crt: bytes, encoding="utf-8") -> bool:
+    def _validate_certificate(self, crt: bytes) -> bool:
         """Ensure a given certificate contains the correct SANs and is valid temporally."""
         # Ensure the certificate date is valie
-        if not SelfSignedCert.validate_cert_date(crt, encoding=encoding):
+        if not SelfSignedCert.validate_cert_date(crt):
+            logger.info("Certificate has an invalid date.")
             return False
 
         # If the cert is valid and pod IP is already in the cert, we're good
-        if self._pod_ip not in SelfSignedCert.sans_from_cert(crt, encoding=encoding):
+        sans = SelfSignedCert.sans_from_cert(crt)
+        if str(self._pod_ip) not in sans:
+            logger.info(f"Pod IP {self._pod_ip} isn't present as a sans record {sans}.")
             return False
 
         return True
