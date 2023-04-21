@@ -10,8 +10,7 @@ from unittest.mock import MagicMock, Mock, PropertyMock, mock_open, patch
 
 import lightkube
 from charm import KubernetesDashboardCharm
-from charms.kubernetes_dashboard.v0.cert import SelfSignedCert
-from cryptography import x509
+from charms.kubernetes_dashboard.v1.cert import SelfSignedCert
 from lightkube import codecs
 from lightkube.core.exceptions import ApiError
 from lightkube.models.apps_v1 import StatefulSet, StatefulSetSpec
@@ -210,7 +209,7 @@ class TestCharm(unittest.TestCase):
         container = self.charm.unit.get_container("dashboard")
         container.push("/certs/tls.crt", TEST_CERTIFICATE, make_dirs=True)
         self.charm._configure_tls_certs()
-        validate.assert_called_with(x509.load_pem_x509_certificate(TEST_CERTIFICATE))
+        validate.assert_called_with(TEST_CERTIFICATE)
 
     @patch("charm.SelfSignedCert")
     @patch(f"{CHARM}._validate_certificate", lambda x, y: False)
@@ -367,7 +366,7 @@ class TestCharm(unittest.TestCase):
 
     def test_validate_certificates_success(self):
         certificate = SelfSignedCert(names=["dashboard.dev"], ips=[IPv4Address("10.10.10.10")])
-        result = self.charm._validate_certificate(x509.load_pem_x509_certificate(certificate.cert))
+        result = self.charm._validate_certificate(certificate.cert)
         self.assertTrue(result)
 
     def test_validate_certificates_failure_time_expired(self):
@@ -388,12 +387,12 @@ class TestCharm(unittest.TestCase):
                 "-----END CERTIFICATE-----",
             ]
         ).encode()
-        result = self.charm._validate_certificate(x509.load_pem_x509_certificate(expired))
+        result = self.charm._validate_certificate(expired)
         self.assertFalse(result)
 
     def test_validate_certificates_failure_wrong_ips(self):
         certificate = SelfSignedCert(names=["dashboard.dev"], ips=[IPv4Address("8.8.8.8")])
-        result = self.charm._validate_certificate(x509.load_pem_x509_certificate(certificate.cert))
+        result = self.charm._validate_certificate(certificate.cert)
         self.assertFalse(result)
 
     def test_property_dashboard_volumes(self):

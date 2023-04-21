@@ -26,7 +26,7 @@ METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest):
+async def test_build_and_deploy(ops_test: OpsTest, arch: str, series: str):
     """Build the charm-under-test and deploy it together with related charms.
 
     Assert on the unit status before any relations/configurations take place.
@@ -38,7 +38,12 @@ async def test_build_and_deploy(ops_test: OpsTest):
         "scraper-image": METADATA["resources"]["scraper-image"]["upstream-source"],
     }
     await ops_test.model.deploy(
-        charm, resources=resources, application_name="dashboard", trust=True, series="jammy"
+        charm,
+        resources=resources,
+        application_name="dashboard",
+        trust=True,
+        series=series,
+        constraints=f"arch={arch}",
     )
 
     # issuing dummy update_status just to trigger an event
@@ -65,7 +70,7 @@ async def test_kubernetes_resources_created(ops_test: OpsTest):
 
 @pytest.mark.abort_on_fail
 async def test_dashboard_is_up(ops_test: OpsTest):
-    status = await ops_test.model.get_status()  # noqa: F821
+    status = await ops_test.model.get_status()
     address = status["applications"]["dashboard"]["units"]["dashboard/0"]["address"]
 
     url = f"https://{address}:8443"

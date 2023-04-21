@@ -4,7 +4,6 @@
 
 """Charmed Operator for the Official Kubernetes Dashboard."""
 
-import datetime
 import logging
 import traceback
 from glob import glob
@@ -12,10 +11,8 @@ from ipaddress import IPv4Address
 from subprocess import check_output
 from typing import List, Optional
 
-from charms.kubernetes_dashboard.v0.cert import SelfSignedCert
+from charms.kubernetes_dashboard.v1.cert import SelfSignedCert
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
-from cryptography import x509
-from cryptography.x509.base import Certificate
 from lightkube import Client, codecs
 from lightkube.core.exceptions import ApiError
 from lightkube.models.core_v1 import EmptyDirVolumeSource, Volume, VolumeMount
@@ -136,8 +133,7 @@ class KubernetesDashboardCharm(CharmBase):
             # Pull the tls.crt file from the workload container
             cert_bytes = container.pull("/certs/tls.crt")
             # Create an x509 Certificate object with the contents of the file
-            c = x509.load_pem_x509_certificate(bytes(cert_bytes.read(), encoding="utf-8"))
-            if self._validate_certificate(c):
+            if self._validate_certificate(bytes(cert_bytes.read(), encoding="utf-8")):
                 return
 
         # If we get this far, the cert is either not present, or invalid
@@ -191,16 +187,20 @@ class KubernetesDashboardCharm(CharmBase):
                             raise
         return True
 
-    def _validate_certificate(self, c: Certificate) -> bool:
+    def _validate_certificate(self, crt: bytes) -> bool:
         """Ensure a given certificate contains the correct SANs and is valid temporally."""
-        # Get the list of IP Addresses in the SAN field
-        cert_san_ips = c.extensions.get_extension_for_class(
-            x509.SubjectAlternativeName
-        ).value.get_values_for_type(x509.IPAddress)
+        # Ensure the certificate date is valie
+        if not SelfSignedCert.validate_cert_date(crt):
+            logger.info("Certificate has an invalid date.")
+            return False
+
         # If the cert is valid and pod IP is already in the cert, we're good
-        if self._pod_ip in cert_san_ips and c.not_valid_after >= datetime.datetime.utcnow():
-            return True
-        return False
+        sans = SelfSignedCert.sans_from_cert(crt)
+        if str(self._pod_ip) not in sans:
+            logger.info(f"Pod IP {self._pod_ip} isn't present as a sans record {sans}.")
+            return False
+
+        return True
 
     @property
     def _dashboard_volumes(self) -> List[Volume]:
