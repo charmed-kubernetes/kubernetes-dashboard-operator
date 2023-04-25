@@ -185,7 +185,7 @@ class KubernetesDashboardCharm(CharmBase):
             certificate = RelationCert(self.interface_tls, common_name=self._fqdn[0])
             if not certificate.available:
                 logger.info("Requesting TLS certificate for the Kubernetes Dashboard.")
-                certificate.request(sans=self._fqdn + list(map(str,ips)))
+                certificate.request(sans=self._fqdn + list(map(str, ips)))
                 # this will trigger another relation change event
                 return False
 

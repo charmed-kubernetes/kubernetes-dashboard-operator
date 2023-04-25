@@ -3,7 +3,6 @@
 
 
 import unittest
-from contextlib import contextmanager
 from glob import glob
 from ipaddress import IPv4Address
 from types import SimpleNamespace
@@ -26,7 +25,7 @@ from lightkube.models.core_v1 import (
     VolumeMount,
 )
 from lightkube.models.meta_v1 import LabelSelector, ObjectMeta
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus, ErrorStatus
+from ops.model import ActiveStatus, BlockedStatus, ErrorStatus, MaintenanceStatus, WaitingStatus
 from ops.pebble import APIError, ChangeError, ConnectionError
 from ops.testing import Harness
 
@@ -81,7 +80,7 @@ class TestCharm(unittest.TestCase):
         self.harness.set_can_connect("dashboard", True)
         self.harness.set_can_connect("scraper", True)
         self.charm = self.harness.charm
-        
+
     def _dashboard_service(self, *, started=False) -> None:
         container = self.charm.unit.get_container("dashboard")
         layer = {"services": {"dashboard": {}}}
@@ -124,7 +123,7 @@ class TestCharm(unittest.TestCase):
     def test_dashboard_interface_tls_ready_no_dashboard(self, status, configure_tls_certs):
         # self._dashboard_service() -- no dashboard service
         with patch.object(self.harness.charm, "interface_tls") as mock_tls_interface:
-            mock_tls_interface.evaluate_relation.return_value = None 
+            mock_tls_interface.evaluate_relation.return_value = None
             self.harness.add_relation("certificates", "easyrsa")
         # Check the method returned without trying to configure the dashboard
         configure_tls_certs.assert_not_called()
@@ -135,7 +134,7 @@ class TestCharm(unittest.TestCase):
         self._dashboard_service()
         configure_tls_certs.return_value = False
         with patch.object(self.harness.charm, "interface_tls") as mock_tls_interface:
-            mock_tls_interface.evaluate_relation.return_value = None 
+            mock_tls_interface.evaluate_relation.return_value = None
             self.harness.add_relation("certificates", "easyrsa")
         # Check the method returned without trying to configure the dashboard
         configure_tls_certs.assert_called_once_with(False)
@@ -336,13 +335,15 @@ class TestCharm(unittest.TestCase):
             self.charm.interface_tls,
             common_name="kubernetes-dashboard.dashboard",
         )
-        cert.return_value.request.assert_called_once_with(sans=[
-            "kubernetes-dashboard.dashboard",
-            "kubernetes-dashboard.dashboard.svc",
-            "kubernetes-dashboard.dashboard.svc.cluster.local",
-            "10.10.10.10", 
-            "1.1.1.1"
-        ])
+        cert.return_value.request.assert_called_once_with(
+            sans=[
+                "kubernetes-dashboard.dashboard",
+                "kubernetes-dashboard.dashboard.svc",
+                "kubernetes-dashboard.dashboard.svc.cluster.local",
+                "10.10.10.10",
+                "1.1.1.1",
+            ]
+        )
         container = self.charm.unit.get_container("dashboard")
         assert not any(container.list_files("/certs"))
 
@@ -559,6 +560,7 @@ class TestCharm(unittest.TestCase):
         self.charm.unit.status = ErrorStatus()
         self.charm._evaluate_dashboard_status()
         assert self.charm.unit.status == ActiveStatus()
+
 
 class TestCharmNamespaceProperty(unittest.TestCase):
     @patch("builtins.open", new_callable=mock_open, read_data="dashboard")

@@ -5,6 +5,7 @@ from ops.interface_tls_certificates import CertificatesRequires
 from ops.interface_tls_certificates.model import Certificate
 from relation_cert import RelationCert
 
+
 class TestRelationCert(unittest.TestCase):
     def setUp(self) -> None:
         self._name = "testCN"
@@ -13,10 +14,7 @@ class TestRelationCert(unittest.TestCase):
 
     def with_cert(self, rel_cert: RelationCert):
         cert = Certificate(
-            cert_type="server",
-            common_name=self._name,
-            cert="public-data",
-            key="private-data"
+            cert_type="server", common_name=self._name, cert="public-data", key="private-data"
         )
         rel_cert._relation.server_certs_map = {self._name: cert}
 
@@ -24,12 +22,12 @@ class TestRelationCert(unittest.TestCase):
         rel_cert = RelationCert(self.relation, self._name)
         rel_cert.request(["abc"])
         self.relation.request_server_cert.assert_called_once_with(self._name, ["abc"])
-    
+
     def test_is_available(self):
         rel_cert = RelationCert(self.relation, self._name)
         self.with_cert(rel_cert)
         assert rel_cert.available
-    
+
     def test_is_not_available(self):
         rel_cert = RelationCert(self.relation, self._name)
         self.relation.server_certs_map = {}
