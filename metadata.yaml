@@ -14,6 +14,10 @@ description: |
   Dashboard also provides information on the state of Kubernetes resources in your cluster and on
   any errors that may have occurred.
 
+requires:
+  certificates:
+    interface: tls-certificates
+
 containers:
   dashboard:
     resource: dashboard-image
