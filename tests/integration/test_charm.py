@@ -4,6 +4,7 @@
 
 
 import logging
+import shlex
 import ssl
 import urllib.request
 from pathlib import Path
@@ -22,6 +23,7 @@ from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
 
+
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 
 
@@ -32,23 +34,34 @@ async def test_build_and_deploy(ops_test: OpsTest, arch: str, series: str):
     Assert on the unit status before any relations/configurations take place.
     """
     # build and deploy charm from local source folder
-    charm = await ops_test.build_charm(".")
-    resources = {
-        "dashboard-image": METADATA["resources"]["dashboard-image"]["upstream-source"],
-        "scraper-image": METADATA["resources"]["scraper-image"]["upstream-source"],
+    charm = next(Path(".").glob("kubernetes-dashboard*.charm"), None)
+    if not charm:
+        logger.info("Build Charm...")
+        charm = await ops_test.build_charm(".")
+
+    bundles = [Path("tests/data/charm.yaml")]
+    context = {
+        "arch": arch,
+        "charm": charm.resolve(),
+        "model_name": ops_test.model_name,
+        "resources": {
+            "dashboard-image": METADATA["resources"]["dashboard-image"]["upstream-source"],
+            "scraper-image": METADATA["resources"]["scraper-image"]["upstream-source"],
+        },
+        "series": series,
     }
-    await ops_test.model.deploy(
-        charm,
-        resources=resources,
-        application_name="dashboard",
-        trust=True,
-        series=series,
-        constraints=f"arch={arch}",
-    )
+    bundle, = await ops_test.async_render_bundles(*bundles, **context)
+
+    logger.info("Deploy Charm...")
+    model = ops_test.model_full_name
+    cmd = f"juju deploy -m {model} {bundle} --trust"
+    rc, stdout, stderr = await ops_test.run(*shlex.split(cmd))
+    assert rc == 0, f"Bundle deploy failed: {(stderr or stdout).strip()}"
+    logger.info(stdout)
 
     # issuing dummy update_status just to trigger an event
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(apps=["dashboard"], status="active", timeout=1000)
+        await ops_test.model.wait_for_idle(apps=["dashboard"], status="active", timeout=60*5)
         assert ops_test.model.applications["dashboard"].units[0].workload_status == "active"
 
 

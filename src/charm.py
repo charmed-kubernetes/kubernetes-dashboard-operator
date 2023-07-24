@@ -18,7 +18,7 @@ from lightkube.core.exceptions import ApiError
 from lightkube.models.core_v1 import EmptyDirVolumeSource, Volume, VolumeMount
 from lightkube.resources.apps_v1 import StatefulSet
 from lightkube.resources.core_v1 import Service
-from ops.charm import CharmBase, WorkloadEvent
+from ops.charm import CharmBase, WorkloadEvent, RelationBrokenEvent
 from ops.framework import StoredState
 from ops.interface_tls_certificates.requires import CertificatesRequires
 from ops.main import main
@@ -78,15 +78,9 @@ class KubernetesDashboardCharm(CharmBase):
         self._evaluate_dashboard_status()
 
     def _ready_tls(self, event):
-        evaluation = self.interface_tls.evaluate_relation(event)
-        self_sign = True
-        if evaluation and "Waiting" in evaluation:
-            # relation joined, waiting for data
-            self.unit.status = WaitingStatus(evaluation)
-            return
-        elif evaluation is None:
-            # relation joined and ready for accepting requests
-            self_sign = False
+        self_sign = not self.interface_tls.relation or (
+            isinstance(event, RelationBrokenEvent) and event.relation is self.interface_tls.relation
+        )
 
         # Apply tls certs changes to the sidecar container
         container = self.unit.get_container("dashboard")

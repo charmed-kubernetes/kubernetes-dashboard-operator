@@ -14,3 +14,5 @@ def arch(request):
 @pytest.fixture
 def series(request):
     return request.config.getoption("--series")
+
+
