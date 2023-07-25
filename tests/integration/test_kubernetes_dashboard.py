@@ -50,7 +50,7 @@ async def test_build_and_deploy(ops_test: OpsTest, arch: str, series: str):
         },
         "series": series,
     }
-    bundle, = await ops_test.async_render_bundles(*bundles, **context)
+    (bundle,) = await ops_test.async_render_bundles(*bundles, **context)
 
     logger.info("Deploy Charm...")
     model = ops_test.model_full_name
@@ -61,7 +61,7 @@ async def test_build_and_deploy(ops_test: OpsTest, arch: str, series: str):
 
     # issuing dummy update_status just to trigger an event
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(apps=["dashboard"], status="active", timeout=60*5)
+        await ops_test.model.wait_for_idle(apps=["dashboard"], status="active", timeout=60 * 5)
         assert ops_test.model.applications["dashboard"].units[0].workload_status == "active"
 
 
@@ -70,8 +70,8 @@ async def test_kubernetes_resources_created(ops_test: OpsTest):
     client = Client()
     # A slightly naive test that ensures the relevant Kubernetes resources were created.
     # If any of these fail, an exception is raised and the test will fail
-    client.get(ClusterRole, name="kubernetes_dashboard")
-    client.get(ClusterRoleBinding, name="kubernetes_dashboard")
+    client.get(ClusterRole, name="kubernetes-dashboard")
+    client.get(ClusterRoleBinding, name="kubernetes-dashboard")
     client.get(ConfigMap, name="kubernetes-dashboard-settings", namespace=ops_test.model_name)
     client.get(Role, name="kubernetes-dashboard", namespace=ops_test.model_name)
     client.get(RoleBinding, name="kubernetes-dashboard", namespace=ops_test.model_name)
@@ -79,14 +79,16 @@ async def test_kubernetes_resources_created(ops_test: OpsTest):
     client.get(Secret, name="kubernetes-dashboard-key-holder", namespace=ops_test.model_name)
     client.get(ServiceAccount, name="kubernetes-dashboard", namespace=ops_test.model_name)
     client.get(Service, name="dashboard-metrics-scraper", namespace=ops_test.model_name)
+    client.get(Service, name="dashboard", namespace=ops_test.model_name)
 
 
 @pytest.mark.abort_on_fail
 async def test_dashboard_is_up(ops_test: OpsTest):
-    status = await ops_test.model.get_status()
-    address = status["applications"]["dashboard"]["units"]["dashboard/0"]["address"]
+    client = Client()
+    service = client.get(Service, name="dashboard", namespace=ops_test.model_name)
+    address = service.spec.clusterIP
 
-    url = f"https://{address}:8443"
+    url = f"https://{address}:443"
     logger.info("dashboard public address: https://%s", url)
 
     response = urllib.request.urlopen(

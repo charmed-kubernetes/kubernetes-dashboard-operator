@@ -3,7 +3,7 @@ import pytest
 
 def pytest_addoption(parser):
     parser.addoption("--arch", action="store", default="amd64")
-    parser.addoption("--series", action="store", default="focal")
+    parser.addoption("--series", action="store", default="jammy")
 
 
 @pytest.fixture
@@ -14,5 +14,3 @@ def arch(request):
 @pytest.fixture
 def series(request):
     return request.config.getoption("--series")
-
-

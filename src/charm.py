@@ -18,13 +18,12 @@ from lightkube.core.exceptions import ApiError
 from lightkube.models.core_v1 import EmptyDirVolumeSource, Volume, VolumeMount
 from lightkube.resources.apps_v1 import StatefulSet
 from lightkube.resources.core_v1 import Service
-from ops.charm import CharmBase, WorkloadEvent, RelationBrokenEvent
+from ops.charm import CharmBase, RelationBrokenEvent, WorkloadEvent
 from ops.framework import StoredState
-from ops.interface_tls_certificates.requires import CertificatesRequires
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 from ops.pebble import APIError, ChangeError, ConnectionError
-from relation_cert import RelationCert
+from relation_cert import CertificatesRelation
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +36,7 @@ class KubernetesDashboardCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
 
-        self.interface_tls = CertificatesRequires(self)
+        self.interface_tls = CertificatesRelation(self)
         self._stored.set_default(self_signed_cert=True, dashboard_cmd="")
         self._context = {"namespace": self._namespace, "app_name": self.app.name}
 
@@ -79,7 +78,8 @@ class KubernetesDashboardCharm(CharmBase):
 
     def _ready_tls(self, event):
         self_sign = not self.interface_tls.relation or (
-            isinstance(event, RelationBrokenEvent) and event.relation is self.interface_tls.relation
+            isinstance(event, RelationBrokenEvent)
+            and event.relation is self.interface_tls.relation
         )
 
         # Apply tls certs changes to the sidecar container
@@ -176,10 +176,11 @@ class KubernetesDashboardCharm(CharmBase):
             logger.info("new self-signed TLS certificate generated for the Kubernetes Dashboard.")
             certificate = SelfSignedCert(names=self._fqdn, ips=ips)
         else:
-            certificate = RelationCert(self.interface_tls, common_name=self._fqdn[0])
-            if not certificate.available:
+            common_name = self._fqdn[0]
+            certificate = self.interface_tls.certificate(common_name)
+            if not certificate:
                 logger.info("Requesting TLS certificate for the Kubernetes Dashboard.")
-                certificate.request(sans=self._fqdn + list(map(str, ips)))
+                self.interface_tls.request(common_name, sans=self._fqdn + list(map(str, ips)))
                 # this will trigger another relation change event
                 return False
 

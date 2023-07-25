@@ -112,13 +112,6 @@ class TestCharm(unittest.TestCase):
         )
 
     @patch(f"{CHARM}._configure_tls_certs")
-    def test_dashboard_interface_tls_waiting(self, configure_tls_certs):
-        self.harness.add_relation("certificates", "easyrsa")
-        # Check the method returned without trying to configure the dashboard
-        configure_tls_certs.assert_not_called()
-        self.assertEqual(self.charm.unit.status, WaitingStatus("Waiting for certificates"))
-
-    @patch(f"{CHARM}._configure_tls_certs")
     @patch(f"{CHARM}._evaluate_dashboard_status")
     def test_dashboard_interface_tls_ready_no_dashboard(self, status, configure_tls_certs):
         # self._dashboard_service() -- no dashboard service
@@ -141,14 +134,14 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(self.charm.unit.status, WaitingStatus("Waiting for server certificate"))
 
     @patch(f"{CHARM}._configure_tls_certs")
-    def test_dashboard_interface_tls_not_ready(self, configure_tls_certs):
+    def test_dashboard_interface_tls_related(self, configure_tls_certs):
         self._dashboard_service()
         configure_tls_certs.return_value = False
         with patch.object(self.harness.charm, "interface_tls") as mock_tls_interface:
             mock_tls_interface.evaluate_relation.return_value = "Missing required certificates"
             self.harness.add_relation("certificates", "easyrsa")
         # Check the method returned without trying to configure the dashboard
-        configure_tls_certs.assert_called_once_with(True)
+        configure_tls_certs.assert_called_once_with(False)
         self.assertEqual(self.charm.unit.status, WaitingStatus("Waiting for server certificate"))
 
     @patch(f"{CHARM}._configure_tls_certs")
@@ -309,40 +302,37 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(container.pull("/certs/tls.crt").read(), "deadbeef")
         self.assertEqual(container.pull("/certs/tls.key").read(), "deadbeef")
 
-    @patch("charm.RelationCert")
     @patch("charm.Client.get")
-    def test_configure_tls_certs_available_relation(self, get, cert):
-        cert.return_value = SimpleNamespace(available=True, key=b"deadbeef", cert=b"deadbeef")
+    def test_configure_tls_certs_available_relation(self, get):
+        cert = self.charm.interface_tls.certificate = MagicMock()
+        cert.return_value = SimpleNamespace(key=b"deadbeef", cert=b"deadbeef")
         get.return_value = Service(spec=ServiceSpec(clusterIP="1.1.1.1"))
         assert self.charm._configure_tls_certs(False)
         get.assert_called_once()
-        cert.assert_called_once_with(
-            self.charm.interface_tls,
-            common_name="kubernetes-dashboard.dashboard",
-        )
+        cert.assert_called_once_with("kubernetes-dashboard.dashboard")
         container = self.charm.unit.get_container("dashboard")
         self.assertEqual(container.pull("/certs/tls.crt").read(), "deadbeef")
         self.assertEqual(container.pull("/certs/tls.key").read(), "deadbeef")
 
-    @patch("charm.RelationCert")
     @patch("charm.Client.get")
-    def test_configure_tls_certs_unavailable_relation(self, get, cert):
-        cert.return_value = SimpleNamespace(available=False, request=MagicMock())
+    def test_configure_tls_certs_unavailable_relation(self, get):
+        cert = self.charm.interface_tls.certificate = MagicMock()
+        request = self.charm.interface_tls.request = MagicMock()
+        cert.return_value = None
         get.return_value = Service(spec=ServiceSpec(clusterIP="1.1.1.1"))
         assert not self.charm._configure_tls_certs(False)
         get.assert_called_once()
-        cert.assert_called_once_with(
-            self.charm.interface_tls,
-            common_name="kubernetes-dashboard.dashboard",
-        )
-        cert.return_value.request.assert_called_once_with(
+        common_name = "kubernetes-dashboard.dashboard"
+        cert.assert_called_once_with(common_name)
+        request.assert_called_once_with(
+            common_name,
             sans=[
                 "kubernetes-dashboard.dashboard",
                 "kubernetes-dashboard.dashboard.svc",
                 "kubernetes-dashboard.dashboard.svc.cluster.local",
                 "10.10.10.10",
                 "1.1.1.1",
-            ]
+            ],
         )
         container = self.charm.unit.get_container("dashboard")
         assert not any(container.list_files("/certs"))
