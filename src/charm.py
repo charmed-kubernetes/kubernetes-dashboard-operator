@@ -40,18 +40,21 @@ class KubernetesDashboardCharm(CharmBase):
         self._stored.set_default(self_signed_cert=True, dashboard_cmd="")
         self._context = {"namespace": self._namespace, "app_name": self.app.name}
 
-        self.framework.observe(self.on.install, self._on_install)
+        self.framework.observe(self.on.install, self._on_install_or_upgrade)
+        self.framework.observe(self.on.upgrade_charm, self._on_install_or_upgrade)
         self.framework.observe(self.on.dashboard_pebble_ready, self._dashboard_pebble_ready)
         self.framework.observe(self.on.scraper_pebble_ready, self._scraper_pebble_ready)
 
         self.framework.observe(self.on.certificates_relation_created, self._ready_tls)
         self.framework.observe(self.on.certificates_relation_changed, self._ready_tls)
         self.framework.observe(self.on.certificates_relation_broken, self._ready_tls)
+        self.framework.observe(self.on.replicas_relation_changed, self._ready_tls)
 
         self._service_patcher = KubernetesServicePatch(self, [("dashboard-https", 443, 8443)])
 
-    def _on_install(self, _) -> None:
+    def _on_install_or_upgrade(self, event) -> None:
         """Handle the install event, create Kubernetes resources."""
+        self.interface_tls.install(event)
         self.unit.status = MaintenanceStatus("creating kubernetes resources")
         try:
             self._create_kubernetes_resources()
@@ -77,10 +80,12 @@ class KubernetesDashboardCharm(CharmBase):
         self._evaluate_dashboard_status()
 
     def _ready_tls(self, event):
-        self_sign = not self.interface_tls.relation or (
+        breaking = (
             isinstance(event, RelationBrokenEvent)
             and event.relation is self.interface_tls.relation
         )
+
+        self_sign = not self.interface_tls.relation or breaking
 
         # Apply tls certs changes to the sidecar container
         container = self.unit.get_container("dashboard")
@@ -170,17 +175,16 @@ class KubernetesDashboardCharm(CharmBase):
             if self._validate_certificate(bytes(cert_bytes.read(), encoding="utf-8")):
                 return True
 
-        ips = [self._pod_ip, self._svc_ip]
+        ips = [self._svc_ip, self._pod_ip]
         if self_signed:
             # If we get this far, the cert is either not present or needs refreshing
             logger.info("new self-signed TLS certificate generated for the Kubernetes Dashboard.")
             certificate = SelfSignedCert(names=self._fqdn, ips=ips)
         else:
-            common_name = self._fqdn[0]
-            certificate = self.interface_tls.certificate(common_name)
+            certificate = self.interface_tls.certificate()
             if not certificate:
                 logger.info("Requesting TLS certificate for the Kubernetes Dashboard.")
-                self.interface_tls.request(common_name, sans=self._fqdn + list(map(str, ips)))
+                self.interface_tls.request(names=self._fqdn, ips=ips)
                 # this will trigger another relation change event
                 return False
 

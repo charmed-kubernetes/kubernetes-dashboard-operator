@@ -277,7 +277,7 @@ class TestCharm(unittest.TestCase):
                 "kubernetes-dashboard.dashboard.svc",
                 "kubernetes-dashboard.dashboard.svc.cluster.local",
             ],
-            ips=[IPv4Address("10.10.10.10"), IPv4Address("1.1.1.1")],
+            ips=[IPv4Address("1.1.1.1"), IPv4Address("10.10.10.10")],
         )
         container = self.charm.unit.get_container("dashboard")
         self.assertEqual(container.pull("/certs/tls.crt").read(), "deadbeef")
@@ -296,7 +296,7 @@ class TestCharm(unittest.TestCase):
                 "kubernetes-dashboard.dashboard.svc",
                 "kubernetes-dashboard.dashboard.svc.cluster.local",
             ],
-            ips=[IPv4Address("10.10.10.10"), IPv4Address("1.1.1.1")],
+            ips=[IPv4Address("1.1.1.1"), IPv4Address("10.10.10.10")],
         )
         container = self.charm.unit.get_container("dashboard")
         self.assertEqual(container.pull("/certs/tls.crt").read(), "deadbeef")
@@ -309,7 +309,7 @@ class TestCharm(unittest.TestCase):
         get.return_value = Service(spec=ServiceSpec(clusterIP="1.1.1.1"))
         assert self.charm._configure_tls_certs(False)
         get.assert_called_once()
-        cert.assert_called_once_with("kubernetes-dashboard.dashboard")
+        cert.assert_called_once_with()
         container = self.charm.unit.get_container("dashboard")
         self.assertEqual(container.pull("/certs/tls.crt").read(), "deadbeef")
         self.assertEqual(container.pull("/certs/tls.key").read(), "deadbeef")
@@ -322,16 +322,16 @@ class TestCharm(unittest.TestCase):
         get.return_value = Service(spec=ServiceSpec(clusterIP="1.1.1.1"))
         assert not self.charm._configure_tls_certs(False)
         get.assert_called_once()
-        common_name = "kubernetes-dashboard.dashboard"
-        cert.assert_called_once_with(common_name)
+        cert.assert_called_once_with()
         request.assert_called_once_with(
-            common_name,
-            sans=[
+            names=[
                 "kubernetes-dashboard.dashboard",
                 "kubernetes-dashboard.dashboard.svc",
                 "kubernetes-dashboard.dashboard.svc.cluster.local",
-                "10.10.10.10",
-                "1.1.1.1",
+            ],
+            ips=[
+                IPv4Address("1.1.1.1"),
+                IPv4Address("10.10.10.10"),
             ],
         )
         container = self.charm.unit.get_container("dashboard")

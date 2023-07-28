@@ -19,6 +19,10 @@ requires:
     interface: tls-certificates
     limit: 1
 
+peers:
+  replicas:
+    interface: tls-certificates-replica
+
 containers:
   dashboard:
     resource: dashboard-image
