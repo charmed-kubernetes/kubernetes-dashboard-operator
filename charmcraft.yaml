@@ -52,6 +52,7 @@ parts:
   charm:
     charm-python-packages: [setuptools, pip]
     build-packages:
+      - git
       - libffi-dev
       - libssl-dev
       - pkg-config
