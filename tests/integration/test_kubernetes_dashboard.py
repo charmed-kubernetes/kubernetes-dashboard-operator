@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 
 
+import ipaddress
 import logging
 import shlex
 import ssl
@@ -11,6 +12,11 @@ from pathlib import Path
 
 import pytest
 import yaml
+from cryptography.x509 import (
+    DNSName,
+    ObjectIdentifier,
+    load_pem_x509_certificate,
+)
 from lightkube import Client
 from lightkube.resources.core_v1 import ConfigMap, Secret, Service, ServiceAccount
 from lightkube.resources.rbac_authorization_v1 import (
@@ -95,3 +101,48 @@ async def test_dashboard_is_up(ops_test: OpsTest):
         url, data=None, timeout=2.0, context=ssl._create_unverified_context()
     )
     assert response.code == 200
+
+
+def get_dashboard_certificate(namespace: str, address=None):
+    """Retrieve Certificate of the dashboard service in the namespace."""
+    if address is None:
+        client = Client()
+        service = client.get(Service, name="dashboard", namespace=namespace)
+        address = service.spec.clusterIP, 443
+
+    cert_str = ssl.get_server_certificate(address)
+    cert = load_pem_x509_certificate(cert_str.encode())
+
+    expected_common_name = f"dashboard.{namespace}"
+    common_name = cert.subject.get_attributes_for_oid(ObjectIdentifier("2.5.4.3"))
+    val, *_ = (_.value for _ in common_name)
+
+    assert val == expected_common_name, f"Unexpected certificate for service at {address}"
+
+    sans = cert.extensions.get_extension_for_oid(ObjectIdentifier("2.5.29.17"))
+    assert len(sans.value) == 5, "Expect 5 addresses in SANS"
+    for attr in sans.value:
+        if isinstance(attr, DNSName):
+            try:
+                # It's possible that DNSNames actually are
+                # misrepresented IP Addresses -- filter those out
+                ipaddress.ip_address(attr.value)
+            except ValueError:
+                # Non-IP Addresses should be fqdn names
+                assert expected_common_name in attr.value
+
+    return cert
+
+
+async def test_certificate_is_remotelysigned(ops_test: OpsTest):
+    cert = get_dashboard_certificate(ops_test.model.name)
+    assert cert.issuer != cert.subject, "Certificate is Self-signed"
+
+
+async def test_certificate_is_selfsigned(ops_test: OpsTest):
+    dashboard = ops_test.model.applications["dashboard"]
+    await dashboard.remove_relation("certificates", "tls-certificates:certificates")
+    await ops_test.model.wait_for_idle(apps=["dashboard"], status="active", timeout=60 * 5)
+
+    cert = get_dashboard_certificate(ops_test.model.name)
+    assert cert.issuer == cert.subject, "Certificate isn't Self-signed"
