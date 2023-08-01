@@ -18,11 +18,12 @@ from lightkube.core.exceptions import ApiError
 from lightkube.models.core_v1 import EmptyDirVolumeSource, Volume, VolumeMount
 from lightkube.resources.apps_v1 import StatefulSet
 from lightkube.resources.core_v1 import Service
-from ops.charm import CharmBase, WorkloadEvent
+from ops.charm import CharmBase, RelationBrokenEvent, WorkloadEvent
 from ops.framework import StoredState
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 from ops.pebble import APIError, ChangeError, ConnectionError
+from relation_cert import CertificatesRelation
 
 logger = logging.getLogger(__name__)
 
@@ -34,17 +35,26 @@ class KubernetesDashboardCharm(CharmBase):
 
     def __init__(self, *args):
         super().__init__(*args)
-        self._stored.set_default(dashboard_cmd="")
+
+        self.interface_tls = CertificatesRelation(self)
+        self._stored.set_default(self_signed_cert=True, dashboard_cmd="")
         self._context = {"namespace": self._namespace, "app_name": self.app.name}
 
-        self.framework.observe(self.on.install, self._on_install)
+        self.framework.observe(self.on.install, self._on_install_or_upgrade)
+        self.framework.observe(self.on.upgrade_charm, self._on_install_or_upgrade)
         self.framework.observe(self.on.dashboard_pebble_ready, self._dashboard_pebble_ready)
         self.framework.observe(self.on.scraper_pebble_ready, self._scraper_pebble_ready)
 
+        self.framework.observe(self.on.certificates_relation_created, self._ready_tls)
+        self.framework.observe(self.on.certificates_relation_changed, self._ready_tls)
+        self.framework.observe(self.on.certificates_relation_broken, self._ready_tls)
+        self.framework.observe(self.on.replicas_relation_changed, self._ready_tls)
+
         self._service_patcher = KubernetesServicePatch(self, [("dashboard-https", 443, 8443)])
 
-    def _on_install(self, _) -> None:
+    def _on_install_or_upgrade(self, event) -> None:
         """Handle the install event, create Kubernetes resources."""
+        self.interface_tls.install(event)
         self.unit.status = MaintenanceStatus("creating kubernetes resources")
         try:
             self._create_kubernetes_resources()
@@ -67,7 +77,33 @@ class KubernetesDashboardCharm(CharmBase):
             event.defer()
             return
 
-        self.unit.status = ActiveStatus()
+        self._evaluate_dashboard_status()
+
+    def _ready_tls(self, event):
+        breaking = (
+            isinstance(event, RelationBrokenEvent)
+            and event.relation is self.interface_tls.relation
+        )
+
+        self_sign = not self.interface_tls.relation or breaking
+
+        # Apply tls certs changes to the sidecar container
+        container = self.unit.get_container("dashboard")
+        if container.can_connect() and "dashboard" in container.get_services():
+            if self._configure_tls_certs(self_sign):
+                container.restart("dashboard")
+                self._stored.self_signed_cert = self_sign
+            else:
+                self.unit.status = WaitingStatus("Waiting for server certificate")
+                return
+
+        self._evaluate_dashboard_status()
+
+    def _evaluate_dashboard_status(self):
+        container = self.unit.get_container("dashboard")
+        service = container.can_connect() and container.get_services().get("dashboard")
+        if service and service.is_running():
+            self.unit.status = ActiveStatus()
 
     def _scraper_pebble_ready(self, event: WorkloadEvent) -> None:
         """Configure Pebble to start the Kubernetes Metrics Scraper."""
@@ -100,10 +136,9 @@ class KubernetesDashboardCharm(CharmBase):
                 }
                 container.add_layer("dashboard", layer, combine=True)
                 self._stored.dashboard_cmd = cmd
-                self._configure_tls_certs()
                 logger.debug("starting Kubernetes Dashboard with command: '%s'.", cmd)
+                self._configure_tls_certs(self._stored.self_signed_cert)
                 container.start("dashboard")
-                return True
             else:
                 return False
         return True
@@ -122,34 +157,40 @@ class KubernetesDashboardCharm(CharmBase):
         ]
         return " ".join(cmd)
 
-    def _configure_tls_certs(self) -> None:
-        """Create a self-signed certificate for the Dashboard if required."""
-        # TODO: Add a branch here for if a secret is specified in config
+    def _configure_tls_certs(self, self_signed: bool) -> bool:
+        """Load certificates for the Dashboard service."""
         # Make the directory we'll use for certs if it doesn't exist
         container = self.unit.get_container("dashboard")
         container.make_dir("/certs", make_parents=True)
+        refresh = self_signed != self._stored.self_signed_cert
         # If there is already a 'tls.crt', then check its validity/suitability.
-        if "tls.crt" in [x.name for x in container.list_files("/certs")]:
+        if (
+            self_signed
+            and not refresh
+            and "tls.crt" in [x.name for x in container.list_files("/certs")]
+        ):
             # Pull the tls.crt file from the workload container
             cert_bytes = container.pull("/certs/tls.crt")
             # Create an x509 Certificate object with the contents of the file
             if self._validate_certificate(bytes(cert_bytes.read(), encoding="utf-8")):
-                return
+                return True
 
-        # If we get this far, the cert is either not present, or invalid
+        ips = [self._svc_ip, self._pod_ip]
+        if self_signed:
+            # If we get this far, the cert is either not present or needs refreshing
+            logger.info("new self-signed TLS certificate generated for the Kubernetes Dashboard.")
+            certificate = SelfSignedCert(names=self._fqdn, ips=ips)
+        else:
+            certificate = self.interface_tls.certificate()
+            if not certificate:
+                logger.info("Requesting TLS certificate for the Kubernetes Dashboard.")
+                self.interface_tls.request(names=self._fqdn, ips=ips)
+                # this will trigger another relation change event
+                return False
 
-        # Get the cluster IP for the kubernetes service that represents the dashboard
-        client = Client()
-        svc: Service = client.get(Service, self.app.name, namespace=self._namespace)
-        svc_ip = IPv4Address(svc.spec.clusterIP)
-
-        # Generate a valid self-signed certificate, set the Pod IP/Svc IP as SANs
-        fqdn = f"{self.app.name}.{self._namespace}.svc.cluster.local"
-        certificate = SelfSignedCert(names=[fqdn], ips=[self._pod_ip, svc_ip])
-        # Write the generated certificate and key to file
         container.push("/certs/tls.crt", certificate.cert, make_dirs=True)
         container.push("/certs/tls.key", certificate.key, make_dirs=True)
-        logger.info("new self-signed TLS certificate generated for the Kubernetes Dashboard.")
+        return True
 
     def _patch_statefulset(self) -> None:
         """Patch the StatefulSet to include specific ServiceAccount and Secret mounts."""
@@ -238,6 +279,22 @@ class KubernetesDashboardCharm(CharmBase):
     def _pod_ip(self) -> Optional[IPv4Address]:
         """Get the IP address of the Kubernetes pod."""
         return IPv4Address(check_output(["unit-get", "private-address"]).decode().strip())
+
+    @property
+    def _svc_ip(self) -> Optional[IPv4Address]:
+        """Get the IP address of the Kubernetes service."""
+        client = Client()
+        svc: Service = client.get(Service, self.app.name, namespace=self._namespace)
+        return IPv4Address(svc.spec.clusterIP)
+
+    @property
+    def _fqdn(self) -> List[str]:
+        """Get the list of FQDNs to use in cert creation for this service."""
+        return [
+            f"{self.app.name}.{self._namespace}",
+            f"{self.app.name}.{self._namespace}.svc",
+            f"{self.app.name}.{self._namespace}.svc.cluster.local",
+        ]
 
 
 if __name__ == "__main__":  # pragma: nocover

@@ -1,0 +1,19 @@
+description: Overlay for testing current charm
+bundle: kubernetes
+applications:
+  tls-certificates:
+    charm: tls-certificates-operator
+    scale: 1
+    options:
+      ca-common-name: {{model_name}}
+      generate-self-signed-certificates: true
+  dashboard:
+    charm: {{charm}}
+    resources: {{resources}}
+    trust: true
+    series: {{series}}
+    constraints: arch={{arch}}
+    scale: 1
+relations:
+- - dashboard:certificates
+  - tls-certificates:certificates
