@@ -12,7 +12,9 @@ from subprocess import check_output
 from typing import List, Optional
 
 from charms.kubernetes_dashboard.v1.cert import SelfSignedCert
-from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
+from charms.observability_libs.v0.kubernetes_service_patch import \
+    KubernetesServicePatch
+from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer
 from lightkube import Client, codecs
 from lightkube.core.exceptions import ApiError
 from lightkube.models.core_v1 import EmptyDirVolumeSource, Volume, VolumeMount
@@ -21,8 +23,10 @@ from lightkube.resources.core_v1 import Service
 from ops.charm import CharmBase, RelationBrokenEvent, WorkloadEvent
 from ops.framework import StoredState
 from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
+from ops.model import (ActiveStatus, BlockedStatus, MaintenanceStatus,
+                       WaitingStatus)
 from ops.pebble import APIError, ChangeError, ConnectionError
+
 from relation_cert import CertificatesRelation
 
 logger = logging.getLogger(__name__)
@@ -51,6 +55,12 @@ class KubernetesDashboardCharm(CharmBase):
         self.framework.observe(self.on.replicas_relation_changed, self._ready_tls)
 
         self._service_patcher = KubernetesServicePatch(self, [("dashboard-https", 443, 8443)])
+        self._ingress = IngressPerAppRequirer(
+            self,
+            host=f"{self.app.name}.{self.model.name}.svc.cluster.local",
+            port=443,
+            scheme=lambda: "https",
+        )
 
     def _on_install_or_upgrade(self, event) -> None:
         """Handle the install event, create Kubernetes resources."""
