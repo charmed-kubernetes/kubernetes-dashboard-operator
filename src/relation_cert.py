@@ -7,11 +7,8 @@ from ipaddress import IPv4Address
 from typing import List, Optional
 
 from charms.tls_certificates_interface.v2.tls_certificates import (
-    CertificateAvailableEvent,
-    TLSCertificatesRequiresV2,
-    generate_csr,
-    generate_private_key,
-)
+    CertificateAvailableEvent, TLSCertificatesRequiresV2, generate_csr,
+    generate_private_key)
 from cryptography import x509
 from ops.framework import Framework, Object
 from ops.interface_tls_certificates import CertificatesRequires
@@ -133,7 +130,7 @@ class TelcoRequires(Object):
 
         if all(replica_data.get(key) for key in ["certificate", "ca", "chain"]):
             log.info("Using Certificate from telco tls-certificates relation.")
-            cert = replica_data["certificate"] + "\n" + replica_data["chain"]
+            cert = replica_data["certificate"]
             return Certificate(
                 subject,
                 cert.encode(),
