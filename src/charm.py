@@ -5,6 +5,7 @@
 """Charmed Operator for the Official Kubernetes Dashboard."""
 
 import logging
+import socket
 import traceback
 from glob import glob
 from ipaddress import IPv4Address
@@ -300,6 +301,7 @@ class KubernetesDashboardCharm(CharmBase):
     def _fqdn(self) -> List[str]:
         """Get the list of FQDNs to use in cert creation for this service."""
         return [
+            socket.getfqdn(),
             f"{self.app.name}.{self._namespace}",
             f"{self.app.name}.{self._namespace}.svc",
             f"{self.app.name}.{self._namespace}.svc.cluster.local",
