@@ -59,6 +59,7 @@ class KubernetesDashboardCharm(CharmBase):
         self._ingress = IngressPerAppRequirer(
             self,
             port=8443,
+            strip_prefix=True,
             scheme=lambda: "https",
         )
 
