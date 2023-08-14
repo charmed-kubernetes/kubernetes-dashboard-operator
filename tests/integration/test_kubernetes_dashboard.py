@@ -94,7 +94,7 @@ async def test_dashboard_is_up(ops_test: OpsTest):
     service = client.get(Service, name="dashboard", namespace=ops_test.model_name)
     address = service.spec.clusterIP
 
-    url = f"https://{address}:443"
+    url = f"https://{address}:8443"
     logger.info("dashboard public address: https://%s", url)
 
     response = urllib.request.urlopen(
@@ -129,7 +129,7 @@ def get_dashboard_certificate(namespace: str, address=None):
     if address is None:
         client = Client()
         service = client.get(Service, name="dashboard", namespace=namespace)
-        address = service.spec.clusterIP, 443
+        address = service.spec.clusterIP, 8443
 
     cert_str = ssl.get_server_certificate(address)
     cert = load_pem_x509_certificate(cert_str.encode())
@@ -141,7 +141,7 @@ def get_dashboard_certificate(namespace: str, address=None):
     assert val == expected_common_name, f"Unexpected certificate for service at {address}"
 
     sans = cert.extensions.get_extension_for_oid(ObjectIdentifier("2.5.29.17"))
-    assert len(sans.value) == 5, "Expect 5 addresses in SANS"
+    assert len(sans.value) == 6, "Expect 6 addresses in SANS"
     for attr in sans.value:
         if isinstance(attr, DNSName):
             try:
