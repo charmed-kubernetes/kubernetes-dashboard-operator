@@ -3,20 +3,18 @@
 # See LICENSE file for licensing details.
 
 
+import asyncio
 import ipaddress
 import logging
 import shlex
 import ssl
 import urllib.request
+from asyncio import subprocess
 from pathlib import Path
 
 import pytest
 import yaml
-from cryptography.x509 import (
-    DNSName,
-    ObjectIdentifier,
-    load_pem_x509_certificate,
-)
+from cryptography.x509 import DNSName, ObjectIdentifier, load_pem_x509_certificate
 from lightkube import Client
 from lightkube.resources.core_v1 import ConfigMap, Secret, Service, ServiceAccount
 from lightkube.resources.rbac_authorization_v1 import (
@@ -26,6 +24,8 @@ from lightkube.resources.rbac_authorization_v1 import (
     RoleBinding,
 )
 from pytest_operator.plugin import OpsTest
+
+from tests.integration.helpers import get_address
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +101,27 @@ async def test_dashboard_is_up(ops_test: OpsTest):
         url, data=None, timeout=2.0, context=ssl._create_unverified_context()
     )
     assert response.code == 200
+
+
+async def test_ingress_integration(ops_test: OpsTest):
+    await ops_test.model.deploy("traefik-k8s", channel="edge", trust=True)
+    await ops_test.model.integrate("traefik-k8s:certificates", "tls-certificates:certificates")
+    await ops_test.model.integrate("dashboard:ingress", "traefik-k8s:ingress")
+    await ops_test.model.wait_for_idle(
+        apps=["dashboard", "traefik-k8s"], status="active", timeout=60 * 5
+    )
+
+    address = await get_address(ops_test=ops_test, app_name="traefik-k8s")
+
+    cmd = f"curl -k https://{address}/{ops_test.model.name}-dashboard"
+    process = await subprocess.create_subprocess_shell(
+        cmd=cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+
+    stdout, _ = await process.communicate()
+    assert b"<title>Kubernetes Dashboard</title>" in stdout
 
 
 def get_dashboard_certificate(namespace: str, address=None):

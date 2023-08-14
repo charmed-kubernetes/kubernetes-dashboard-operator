@@ -7,8 +7,11 @@ from ipaddress import IPv4Address
 from typing import List, Optional
 
 from charms.tls_certificates_interface.v2.tls_certificates import (
-    CertificateAvailableEvent, TLSCertificatesRequiresV2, generate_csr,
-    generate_private_key)
+    CertificateAvailableEvent,
+    TLSCertificatesRequiresV2,
+    generate_csr,
+    generate_private_key,
+)
 from cryptography import x509
 from ops.framework import Framework, Object
 from ops.interface_tls_certificates import CertificatesRequires

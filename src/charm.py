@@ -13,8 +13,7 @@ from subprocess import check_output
 from typing import List, Optional
 
 from charms.kubernetes_dashboard.v1.cert import SelfSignedCert
-from charms.observability_libs.v0.kubernetes_service_patch import \
-    KubernetesServicePatch
+from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
 from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer
 from lightkube import Client, codecs
 from lightkube.core.exceptions import ApiError
@@ -24,10 +23,8 @@ from lightkube.resources.core_v1 import Service
 from ops.charm import CharmBase, RelationBrokenEvent, WorkloadEvent
 from ops.framework import StoredState
 from ops.main import main
-from ops.model import (ActiveStatus, BlockedStatus, MaintenanceStatus,
-                       WaitingStatus)
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 from ops.pebble import APIError, ChangeError, ConnectionError
-
 from relation_cert import CertificatesRelation
 
 logger = logging.getLogger(__name__)
@@ -302,10 +299,10 @@ class KubernetesDashboardCharm(CharmBase):
     def _fqdn(self) -> List[str]:
         """Get the list of FQDNs to use in cert creation for this service."""
         return [
-            socket.getfqdn(),
             f"{self.app.name}.{self._namespace}",
             f"{self.app.name}.{self._namespace}.svc",
             f"{self.app.name}.{self._namespace}.svc.cluster.local",
+            socket.getfqdn(),
         ]
 
 

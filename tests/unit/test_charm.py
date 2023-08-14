@@ -2,6 +2,7 @@
 # See LICENSE file for licensing details.
 
 
+import socket
 import unittest
 from glob import glob
 from ipaddress import IPv4Address
@@ -276,6 +277,7 @@ class TestCharm(unittest.TestCase):
                 "kubernetes-dashboard.dashboard",
                 "kubernetes-dashboard.dashboard.svc",
                 "kubernetes-dashboard.dashboard.svc.cluster.local",
+                socket.getfqdn(),
             ],
             ips=[IPv4Address("1.1.1.1"), IPv4Address("10.10.10.10")],
         )
@@ -295,6 +297,7 @@ class TestCharm(unittest.TestCase):
                 "kubernetes-dashboard.dashboard",
                 "kubernetes-dashboard.dashboard.svc",
                 "kubernetes-dashboard.dashboard.svc.cluster.local",
+                socket.getfqdn(),
             ],
             ips=[IPv4Address("1.1.1.1"), IPv4Address("10.10.10.10")],
         )
@@ -328,6 +331,7 @@ class TestCharm(unittest.TestCase):
                 "kubernetes-dashboard.dashboard",
                 "kubernetes-dashboard.dashboard.svc",
                 "kubernetes-dashboard.dashboard.svc.cluster.local",
+                socket.getfqdn(),
             ],
             ips=[
                 IPv4Address("1.1.1.1"),

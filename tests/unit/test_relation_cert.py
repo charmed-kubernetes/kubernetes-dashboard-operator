@@ -198,7 +198,7 @@ class TestTelcoRequires(unittest.TestCase):
         mock_replica_data.assert_called_once_with(None)
         mock_csr_attrs.assert_called_once_with(b"--certificate-signing-request--")
         assert cert.common_name == "testCN"
-        assert cert.cert == b"public-data\nchain1\n\nchain2"
+        assert cert.cert == b"public-data"
         assert cert.key == b"private-data"
         assert cert.ca == b"ca-data"
 
