@@ -94,7 +94,7 @@ async def test_dashboard_is_up(ops_test: OpsTest):
     service = client.get(Service, name="dashboard", namespace=ops_test.model_name)
     address = service.spec.clusterIP
 
-    url = f"https://{address}:8443"
+    url = f"https://{address}:443"
     logger.info("dashboard public address: https://%s", url)
 
     response = urllib.request.urlopen(
@@ -135,7 +135,7 @@ def get_dashboard_certificate(namespace: str, address=None):
     if address is None:
         client = Client()
         service = client.get(Service, name="dashboard", namespace=namespace)
-        address = service.spec.clusterIP, 8443
+        address = service.spec.clusterIP, 443
 
     cert_str = ssl.get_server_certificate(address)
     cert = load_pem_x509_certificate(cert_str.encode())

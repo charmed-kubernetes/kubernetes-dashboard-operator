@@ -52,7 +52,7 @@ class KubernetesDashboardCharm(CharmBase):
         self.framework.observe(self.on.certificates_relation_broken, self._ready_tls)
         self.framework.observe(self.on.replicas_relation_changed, self._ready_tls)
 
-        self._service_patcher = KubernetesServicePatch(self, [("dashboard-https", 8443, 8443)])
+        self._service_patcher = KubernetesServicePatch(self, [("dashboard-https", 443, 8443)])
         self._ingress = IngressPerAppRequirer(
             self,
             port=8443,
