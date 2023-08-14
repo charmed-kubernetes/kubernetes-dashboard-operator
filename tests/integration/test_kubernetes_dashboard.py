@@ -14,14 +14,15 @@ from pathlib import Path
 
 import pytest
 import yaml
-from cryptography.x509 import (DNSName, ObjectIdentifier,
-                               load_pem_x509_certificate)
+from cryptography.x509 import DNSName, ObjectIdentifier, load_pem_x509_certificate
 from lightkube import Client
-from lightkube.resources.core_v1 import (ConfigMap, Secret, Service,
-                                         ServiceAccount)
-from lightkube.resources.rbac_authorization_v1 import (ClusterRole,
-                                                       ClusterRoleBinding,
-                                                       Role, RoleBinding)
+from lightkube.resources.core_v1 import ConfigMap, Secret, Service, ServiceAccount
+from lightkube.resources.rbac_authorization_v1 import (
+    ClusterRole,
+    ClusterRoleBinding,
+    Role,
+    RoleBinding,
+)
 from pytest_operator.plugin import OpsTest
 
 from tests.integration.helpers import get_address
