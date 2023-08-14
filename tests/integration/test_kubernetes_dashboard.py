@@ -14,15 +14,14 @@ from pathlib import Path
 
 import pytest
 import yaml
-from cryptography.x509 import DNSName, ObjectIdentifier, load_pem_x509_certificate
+from cryptography.x509 import (DNSName, ObjectIdentifier,
+                               load_pem_x509_certificate)
 from lightkube import Client
-from lightkube.resources.core_v1 import ConfigMap, Secret, Service, ServiceAccount
-from lightkube.resources.rbac_authorization_v1 import (
-    ClusterRole,
-    ClusterRoleBinding,
-    Role,
-    RoleBinding,
-)
+from lightkube.resources.core_v1 import (ConfigMap, Secret, Service,
+                                         ServiceAccount)
+from lightkube.resources.rbac_authorization_v1 import (ClusterRole,
+                                                       ClusterRoleBinding,
+                                                       Role, RoleBinding)
 from pytest_operator.plugin import OpsTest
 
 from tests.integration.helpers import get_address
@@ -124,6 +123,12 @@ async def test_ingress_integration(ops_test: OpsTest):
     assert b"<title>Kubernetes Dashboard</title>" in stdout
 
 
+def contains_known_fqdns(fqdn: str, namespace: str):
+    endpoints_fqdn = f"dashboard-endpoints.{namespace}"
+    cluster_fqdn = f"dashboard.{namespace}"
+    return endpoints_fqdn in fqdn or cluster_fqdn in fqdn
+
+
 def get_dashboard_certificate(namespace: str, address=None):
     """Retrieve Certificate of the dashboard service in the namespace."""
     if address is None:
@@ -150,7 +155,7 @@ def get_dashboard_certificate(namespace: str, address=None):
                 ipaddress.ip_address(attr.value)
             except ValueError:
                 # Non-IP Addresses should be fqdn names
-                assert expected_common_name in attr.value
+                assert contains_known_fqdns(attr.value, namespace)
 
     return cert
 
