@@ -5,6 +5,7 @@
 """Charmed Operator for the Official Kubernetes Dashboard."""
 
 import logging
+import socket
 import traceback
 from glob import glob
 from ipaddress import IPv4Address
@@ -13,6 +14,7 @@ from typing import List, Optional
 
 from charms.kubernetes_dashboard.v1.cert import SelfSignedCert
 from charms.observability_libs.v0.kubernetes_service_patch import KubernetesServicePatch
+from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer
 from lightkube import Client, codecs
 from lightkube.core.exceptions import ApiError
 from lightkube.models.core_v1 import EmptyDirVolumeSource, Volume, VolumeMount
@@ -51,6 +53,12 @@ class KubernetesDashboardCharm(CharmBase):
         self.framework.observe(self.on.replicas_relation_changed, self._ready_tls)
 
         self._service_patcher = KubernetesServicePatch(self, [("dashboard-https", 443, 8443)])
+        self._ingress = IngressPerAppRequirer(
+            self,
+            port=8443,
+            strip_prefix=True,
+            scheme=lambda: "https",
+        )
 
     def _on_install_or_upgrade(self, event) -> None:
         """Handle the install event, create Kubernetes resources."""
@@ -294,6 +302,7 @@ class KubernetesDashboardCharm(CharmBase):
             f"{self.app.name}.{self._namespace}",
             f"{self.app.name}.{self._namespace}.svc",
             f"{self.app.name}.{self._namespace}.svc.cluster.local",
+            socket.getfqdn(),
         ]
 
 

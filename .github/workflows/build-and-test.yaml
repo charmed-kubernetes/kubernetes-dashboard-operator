@@ -60,5 +60,8 @@ jobs:
           channel: 1.26-strict/stable
           juju-channel: 3.1/edge
           microk8s-group: snap_microk8s
+      - name: Setup MetalLB
+        run: |
+          sudo microk8s enable metallb:10.64.140.43-10.64.140.49
       - name: Run integration tests
         run: tox -e integration

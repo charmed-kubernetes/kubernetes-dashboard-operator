@@ -133,7 +133,7 @@ class TelcoRequires(Object):
 
         if all(replica_data.get(key) for key in ["certificate", "ca", "chain"]):
             log.info("Using Certificate from telco tls-certificates relation.")
-            cert = replica_data["certificate"] + "\n" + replica_data["chain"]
+            cert = replica_data["certificate"]
             return Certificate(
                 subject,
                 cert.encode(),

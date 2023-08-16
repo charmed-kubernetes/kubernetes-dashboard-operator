@@ -3,20 +3,18 @@
 # See LICENSE file for licensing details.
 
 
+import asyncio
 import ipaddress
 import logging
 import shlex
 import ssl
 import urllib.request
+from asyncio import subprocess
 from pathlib import Path
 
 import pytest
 import yaml
-from cryptography.x509 import (
-    DNSName,
-    ObjectIdentifier,
-    load_pem_x509_certificate,
-)
+from cryptography.x509 import DNSName, ObjectIdentifier, load_pem_x509_certificate
 from lightkube import Client
 from lightkube.resources.core_v1 import ConfigMap, Secret, Service, ServiceAccount
 from lightkube.resources.rbac_authorization_v1 import (
@@ -26,6 +24,8 @@ from lightkube.resources.rbac_authorization_v1 import (
     RoleBinding,
 )
 from pytest_operator.plugin import OpsTest
+
+from tests.integration.helpers import get_address
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +103,33 @@ async def test_dashboard_is_up(ops_test: OpsTest):
     assert response.code == 200
 
 
+async def test_ingress_integration(ops_test: OpsTest):
+    await ops_test.model.deploy("traefik-k8s", channel="edge", trust=True)
+    await ops_test.model.integrate("traefik-k8s:certificates", "tls-certificates:certificates")
+    await ops_test.model.integrate("dashboard:ingress", "traefik-k8s:ingress")
+    await ops_test.model.wait_for_idle(
+        apps=["dashboard", "traefik-k8s"], status="active", timeout=60 * 5
+    )
+
+    address = await get_address(ops_test=ops_test, app_name="traefik-k8s")
+
+    cmd = f"curl -k https://{address}/{ops_test.model.name}-dashboard"
+    process = await subprocess.create_subprocess_shell(
+        cmd=cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+
+    stdout, _ = await process.communicate()
+    assert b"<title>Kubernetes Dashboard</title>" in stdout
+
+
+def contains_known_fqdns(fqdn: str, namespace: str):
+    endpoints_fqdn = f"dashboard-endpoints.{namespace}"
+    cluster_fqdn = f"dashboard.{namespace}"
+    return endpoints_fqdn in fqdn or cluster_fqdn in fqdn
+
+
 def get_dashboard_certificate(namespace: str, address=None):
     """Retrieve Certificate of the dashboard service in the namespace."""
     if address is None:
@@ -120,7 +147,7 @@ def get_dashboard_certificate(namespace: str, address=None):
     assert val == expected_common_name, f"Unexpected certificate for service at {address}"
 
     sans = cert.extensions.get_extension_for_oid(ObjectIdentifier("2.5.29.17"))
-    assert len(sans.value) == 5, "Expect 5 addresses in SANS"
+    assert len(sans.value) == 6, "Expect 6 addresses in SANS"
     for attr in sans.value:
         if isinstance(attr, DNSName):
             try:
@@ -129,7 +156,7 @@ def get_dashboard_certificate(namespace: str, address=None):
                 ipaddress.ip_address(attr.value)
             except ValueError:
                 # Non-IP Addresses should be fqdn names
-                assert expected_common_name in attr.value
+                assert contains_known_fqdns(attr.value, namespace)
 
     return cert
 
