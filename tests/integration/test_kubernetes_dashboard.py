@@ -3,13 +3,12 @@
 # See LICENSE file for licensing details.
 
 
-import asyncio
 import ipaddress
+import json
 import logging
 import shlex
 import ssl
 import urllib.request
-from asyncio import subprocess
 from pathlib import Path
 
 import pytest
@@ -24,8 +23,6 @@ from lightkube.resources.rbac_authorization_v1 import (
     RoleBinding,
 )
 from pytest_operator.plugin import OpsTest
-
-from tests.integration.helpers import get_address
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +97,7 @@ async def test_dashboard_is_up(ops_test: OpsTest):
     response = urllib.request.urlopen(
         url, data=None, timeout=2.0, context=ssl._create_unverified_context()
     )
+    assert "Kubernetes Dashboard" in response.read().decode("utf-8")
     assert response.code == 200
 
 
@@ -111,17 +109,18 @@ async def test_ingress_integration(ops_test: OpsTest):
         apps=["dashboard", "traefik-k8s"], status="active", timeout=60 * 5
     )
 
-    address = await get_address(ops_test=ops_test, app_name="traefik-k8s")
+    # Ensure the dashboard is accessible via the traefik ingress
+    traefik_k8s = ops_test.model.applications["traefik-k8s"].units[0]
+    result = await traefik_k8s.run_action("show-proxied-endpoints")
+    await result.wait()
+    endpoints = json.loads(result.results["proxied-endpoints"])
+    url = endpoints["dashboard"]["url"]
 
-    cmd = f"curl -k https://{address}/{ops_test.model.name}-dashboard"
-    process = await subprocess.create_subprocess_shell(
-        cmd=cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
+    response = urllib.request.urlopen(
+        url, data=None, timeout=2.0, context=ssl._create_unverified_context()
     )
-
-    stdout, _ = await process.communicate()
-    assert b"<title>Kubernetes Dashboard</title>" in stdout
+    assert "Kubernetes Dashboard" in response.read().decode("utf-8")
+    assert response.code == 200
 
 
 def contains_known_fqdns(fqdn: str, namespace: str):
