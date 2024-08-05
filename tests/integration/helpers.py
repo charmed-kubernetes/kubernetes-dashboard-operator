@@ -1,6 +1,7 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import ipaddress
 import logging
 from typing import Optional
 
@@ -22,6 +23,13 @@ async def get_address(ops_test: OpsTest, app_name: str, unit_num: Optional[int] 
     """
     status = await ops_test.model.get_status()
     app = status["applications"][app_name]
+    for unit in app.units.values():
+        for part in unit.workload_status.info.split():
+            try:
+                if ipaddress.ip_address(part):
+                    return part
+            except ValueError:
+                continue
     return (
         app.public_address
         if unit_num is None

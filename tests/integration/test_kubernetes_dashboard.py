@@ -3,13 +3,11 @@
 # See LICENSE file for licensing details.
 
 
-import asyncio
 import ipaddress
 import logging
 import shlex
 import ssl
 import urllib.request
-from asyncio import subprocess
 from pathlib import Path
 
 import pytest
@@ -100,6 +98,7 @@ async def test_dashboard_is_up(ops_test: OpsTest):
     response = urllib.request.urlopen(
         url, data=None, timeout=2.0, context=ssl._create_unverified_context()
     )
+    assert "Kubernetes Dashboard" in response.read().decode("utf-8")
     assert response.code == 200
 
 
@@ -113,15 +112,12 @@ async def test_ingress_integration(ops_test: OpsTest):
 
     address = await get_address(ops_test=ops_test, app_name="traefik-k8s")
 
-    cmd = f"curl -k https://{address}/{ops_test.model.name}-dashboard"
-    process = await subprocess.create_subprocess_shell(
-        cmd=cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
+    url = f"https://{address}/{ops_test.model.name}-dashboard"
+    response = urllib.request.urlopen(
+        url, data=None, timeout=2.0, context=ssl._create_unverified_context()
     )
-
-    stdout, _ = await process.communicate()
-    assert b"<title>Kubernetes Dashboard</title>" in stdout
+    assert "Kubernetes Dashboard" in response.read().decode("utf-8")
+    assert response.code == 200
 
 
 def contains_known_fqdns(fqdn: str, namespace: str):
