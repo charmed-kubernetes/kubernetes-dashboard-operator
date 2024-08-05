@@ -26,7 +26,7 @@ from lightkube.models.core_v1 import (
     VolumeMount,
 )
 from lightkube.models.meta_v1 import LabelSelector, ObjectMeta
-from ops.model import ActiveStatus, BlockedStatus, ErrorStatus, MaintenanceStatus, WaitingStatus
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, WaitingStatus
 from ops.pebble import APIError, ChangeError, ConnectionError
 from ops.testing import Harness
 
@@ -545,13 +545,13 @@ class TestCharm(unittest.TestCase):
         self.assertFalse(self.charm._statefulset_patched)
 
     def test_evaluate_dashboard_status_no_service(self):
-        self.charm.unit.status = ErrorStatus()
+        self.charm.unit.status = BlockedStatus("no dashboard service")
         self.charm._evaluate_dashboard_status()
-        assert self.charm.unit.status == ErrorStatus()
+        assert self.charm.unit.status == BlockedStatus("no dashboard service")
 
     def test_evaluate_dashboard_status(self):
         self._dashboard_service(started=True)
-        self.charm.unit.status = ErrorStatus()
+        self.charm.unit.status = BlockedStatus()
         self.charm._evaluate_dashboard_status()
         assert self.charm.unit.status == ActiveStatus()
 
