@@ -102,7 +102,7 @@ async def test_dashboard_is_up(ops_test: OpsTest):
 
 
 async def test_ingress_integration(ops_test: OpsTest):
-    await ops_test.model.deploy("traefik-k8s", channel="edge", trust=True)
+    await ops_test.model.deploy("traefik-k8s", channel="stable", trust=True)
     await ops_test.model.integrate("traefik-k8s:certificates", "tls-certificates:certificates")
     await ops_test.model.integrate("dashboard:ingress", "traefik-k8s:ingress")
     await ops_test.model.wait_for_idle(
