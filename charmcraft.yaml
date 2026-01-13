@@ -15,15 +15,6 @@ bases:
   - build-on:
     - name: "ubuntu"
       channel: "22.04"
-      architectures: ["armhf"]
-    run-on:
-    - name: "ubuntu"
-      channel: "22.04"
-      architectures:
-        - armhf
-  - build-on:
-    - name: "ubuntu"
-      channel: "22.04"
       architectures: ["arm64"]
     run-on:
     - name: "ubuntu"
@@ -50,11 +41,16 @@ bases:
         - s390x
 parts:
   charm:
-    charm-python-packages: [setuptools, pip]
+    plugin: charm
+    override-build: |
+      craftctl default
+      git -C $CRAFT_PROJECT_DIR rev-parse --short HEAD > version
+    charm-binary-python-packages:
+    - maturin
     build-packages:
-      - git
-      - libffi-dev
-      - libssl-dev
-      - pkg-config
-      - rustc
-      - cargo
+    - git
+    - libffi-dev
+    - libssl-dev
+    - pkg-config
+    - rustc
+    - cargo
