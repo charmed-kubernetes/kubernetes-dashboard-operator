@@ -1,9 +1,7 @@
-cryptography==41.0.3
-rpds-py==0.9.2
-jinja2
-jsonschema
-lightkube
-lightkube-models
-ops
-pydantic<2.0
-ops.interface_tls_certificates @ git+https://github.com/charmed-kubernetes/interface-tls-certificates.git@da891c403864482688ec767a964218e5857f0e49#subdirectory=ops
+cryptography==46.0.3
+jinja2==3.1.6
+jsonschema==4.26.0
+lightkube>=0.10.1,<1.0.0
+ops==3.5.0
+pydantic==1.10.26
+ops.interface_tls_certificates @ git+https://github.com/charmed-kubernetes/interface-tls-certificates.git@236e089493c96feac5ea1a8617b1059a4477a04e#subdirectory=ops
