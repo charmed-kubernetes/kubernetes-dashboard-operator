@@ -29,9 +29,23 @@ jobs:
       - name: Run tests
         run: tox -e unit
 
+  charmcraft:
+    name: Determine Charmcraft Channel
+    runs-on: ubuntu-latest
+    outputs:
+      channel: ${{ steps.charmcraft.outputs.channel }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Read charmcraft version file
+        id: charmcraft
+        run: echo "channel=$(cat .charmcraft-channel)" >> $GITHUB_OUTPUT
+
   lib-check:
     name: Check libraries
     runs-on: ubuntu-22.04
+    needs:
+    - charmcraft
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -42,26 +56,25 @@ jobs:
         with:
           credentials: "${{ secrets.CHARMHUB_TOKEN }}"
           github-token: "${{ secrets.GITHUB_TOKEN }}"
+          charmcraft-channel: ${{ needs.charmcraft.outputs.channel }}
 
   integration-test:
     name: Integration tests (microk8s)
     runs-on: ubuntu-22.04
     needs:
+      - charmcraft
       - lint
       - unit-test
       - lib-check
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Read charmcraft version file
-        id: charmcraft
-        run: echo "channel=$(cat .charmcraft-channel)" >> $GITHUB_OUTPUT
       - name: Setup operator environment
         uses: charmed-kubernetes/actions-operator@main
         with:
           provider: microk8s
-          channel: 1.30-strict/stable
-          charmcraft-channel: ${{ steps.charmcraft.outputs.channel }}
+          channel: 1.35-strict/stable
+          charmcraft-channel: ${{ needs.charmcraft.outputs.channel }}
           juju-channel: 3/stable
           microk8s-group: snap_microk8s
       - name: Setup MetalLB
