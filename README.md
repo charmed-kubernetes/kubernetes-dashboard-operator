@@ -6,14 +6,10 @@
 > as of CK 1.36. This operator charm receives no further updates from Canonical. Canonical does
 > not recommend running the Kubernetes Dashboard in production environments.
 >
-> If you still need the dashboard, you can deploy it directly from the upstream project —
-> accepting that support and security patching become your own responsibility:
->
-> ```bash
-> helm upgrade --install kubernetes-dashboard kubernetes-dashboard \
->   --repo https://kubernetes.github.io/dashboard \
->   --namespace kubernetes-dashboard --create-namespace
-> ```
+> If you still need the dashboard, refer to the
+> [upstream Kubernetes Dashboard documentation](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/)
+> for installation instructions — noting that the upstream project itself is now deprecated
+> and unmaintained.
 
 
 ## Description
