@@ -1,5 +1,17 @@
 # Kubernetes Dashboard Operator
 
+> **⚠️ Deprecation notice**
+>
+> The Kubernetes Dashboard is no longer maintained or distributed as part of Charmed Kubernetes
+> as of CK 1.36. This operator charm receives no further updates from Canonical. Canonical does
+> not recommend running the Kubernetes Dashboard in production environments.
+>
+> If you still need the dashboard, refer to the
+> [upstream Kubernetes Dashboard documentation](https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/)
+> for installation instructions — noting that the upstream project itself is now deprecated
+> and unmaintained.
+
+
 ## Description
 
 Dashboard is a web-based Kubernetes user interface. You can use Dashboard to deploy containerized
